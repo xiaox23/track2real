@@ -1,0 +1,1 @@
+python scripts_real/eval_real_peg_insertion_v2_hex.py --team_name UESTCSCU --model_name TD3PolicyForPegInsertionV2 --policy_file_path /home/xulab10/lcy/challenge_2025_real_track2_auxloss/UESTCSCU-Track_2/model/best_model.zip --cfg_file_path /home/xulab10/lcy/challenge_2025_real_track2_auxloss/UESTCSCU-Track_2/configs/parameters/peg_insertion_v2_points.yaml

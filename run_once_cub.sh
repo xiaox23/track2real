@@ -1,0 +1,1 @@
+python scripts_real/eval_real_peg_insertion_v2_cub.py --team_name STEIIA --model_name TD3PolicyWithColoredPointsOffsetPrediction --policy_file_path /home/tars/workspace/xx/tactile/STEIIA-PENTAC-3rd-commit/stg2_2nd/models/policy_stable.zip --cfg_file_path /home/tars/workspace/xx/tactile/STEIIA-PENTAC-3rd-commit/stg2_2nd/Track_2/configs/parameters/peg_insertion_v2_points.yaml
