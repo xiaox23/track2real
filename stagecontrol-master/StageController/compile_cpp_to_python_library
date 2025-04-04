@@ -1,0 +1,1 @@
+g++ -I /usr/include/python3.8 -fPIC rotation_stage_py.cpp -lboost_python38 -L ../RotationStageLibs/ -lGlobal -lNiMotionMotorSDK -l ModbusMaster -lQt5Core -shared -o rotation_stage.so
