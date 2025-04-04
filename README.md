@@ -74,3 +74,8 @@ python catkin_ws/src/gelsight_mini_ros/scripts/gs_node.py
 python catkin_ws/src/gelsight_mini_ros/scripts/draw_marker_and_image.py
 python catkin_ws/src/gelsight_mini_ros/scripts/listener.py
 ```
+
+## check D435i
+```bash
+python utils/real_sense_help.py
+```
