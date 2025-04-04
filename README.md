@@ -61,3 +61,16 @@ make sure that `xyzc` related to `ttyUSB0`, and the `gripper` related to `ttyUSB
 ```bash
 python envs/robotiq_controller.py
 ```
+
+## check Gelsight mini
+不需要`roscore`
+```bash
+python catkin_ws/src/gelsight_mini_ros/scripts/gelsight_mini.py
+```
+
+需要`roscore`
+```bash
+python catkin_ws/src/gelsight_mini_ros/scripts/gs_node.py
+python catkin_ws/src/gelsight_mini_ros/scripts/draw_marker_and_image.py
+python catkin_ws/src/gelsight_mini_ros/scripts/listener.py
+```
