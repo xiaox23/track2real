@@ -1,5 +1,4 @@
 import control
-import time
 
 """ reset the X/Y/Z/C axis to home state"""
 
@@ -19,13 +18,9 @@ if __name__ == "__main__":
     elif case == '2':
         speed = 15000
         controller.absoulte_movement('X', 0, speed)
-        time.sleep(8)
         controller.absoulte_movement('Y', 0, speed)
-        time.sleep(8)
         controller.absoulte_movement('Z', 0, speed)
-        time.sleep(8)
         controller.absoulte_movement('C', 0, 0.01*speed)
-        time.sleep(8)
 
     # 关闭串口连接
     controller.close()
