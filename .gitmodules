@@ -1,3 +1,6 @@
 [submodule "catkin_ws/src/robotiq"]
 	path = catkin_ws/src/robotiq
 	url = https://github.com/ros-industrial-attic/robotiq.git
+[submodule "catkin_ws/src/gelsight_mini_ros"]
+	path = catkin_ws/src/gelsight_mini_ros
+	url = https://github.com/RVSATHU/gelsight_mini_ros.git
