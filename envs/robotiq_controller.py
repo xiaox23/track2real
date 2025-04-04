@@ -120,6 +120,7 @@ class RobotiqGripper:
 
     def __init__(self, serial_port: str, default_speed=100):
         # Initiate output message as an empty list
+        print("*"*20)
         self.message = []
         self.client = Communication()
         self.client.connectToDevice(serial_port)
@@ -127,6 +128,7 @@ class RobotiqGripper:
         self.status = self.get_status()
         if self.is_active():
             self.hand_command = update_robotiq_command('a', self.hand_command, default_speed)
+        print("*"*20)
 
     def verify_command(self, command):
         """Function to verify that the value of each variable satisfy its limits."""
@@ -264,15 +266,15 @@ class RobotiqGripper:
 
 if __name__ == "__main__":
     gripper = RobotiqGripper('/dev/ttyUSB1')
-    # gripper.reset()
+    print(gripper.is_active())
+    gripper.reset()  # 能够激活夹爪
+    print(gripper.is_active())
     gripper.close()
     time.sleep(1)
     gripper.open()
     time.sleep(1)
-    gripper.close()
     exit()
     #time.sleep(1)
-
     # for i in range(255):
     #     gripper.go_to_position(i)
 

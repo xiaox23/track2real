@@ -55,3 +55,9 @@ make sure that `xyzc` related to `ttyUSB0`, and the `gripper` related to `ttyUSB
 
 - ### move_control.py
   育锋的code。
+
+
+## check the gripper
+```bash
+python envs/robotiq_controller.py
+```
