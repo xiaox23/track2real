@@ -50,7 +50,7 @@ make sure that `xyzc` related to `ttyUSB0`, and the `gripper` related to `ttyUSB
 
   当输入为`2`时，采用回绝对值零的方法。
 
-- ### absolute_move.py
+- ### incremental_move.py
   测试相对移动的脚本，但是相对移动不能为0，不然会出bug。
 
 - ### move_control.py
