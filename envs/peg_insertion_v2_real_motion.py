@@ -1012,6 +1012,220 @@ def for_PC_registration(env: PegInsertionRealEnvV2, test_log):
     test_log.info(f"cost time: {end_time - start_time}")
     env.close()
 
+class PegInsertionRealEnvV2_tac(gym.Env):
+    def __init__(
+        self,
+        motion_manager: MotionManagerStageV2,
+        max_action_mm_deg,
+        peg,  # hex
+        max_steps,
+        normalize,
+        grasp_height_offset,
+        insertion_depth_mm: float,
+        # for logging
+        log_path=None,
+        logger=None,
+        # for vision
+        vision_params: dict = None,
+        # render_rgb
+        render_rgb=False,
+    ):
+        # for logging
+        time.sleep(np.random.rand(1)[0])
+        if logger is None:
+            self.logger = log
+            self.logger.remove()
+        else:
+            self.logger = logger
+
+        self.log_time = get_time()
+        self.pid = os.getpid()
+        if log_path is None:
+            self.log_folder = track_path + "/envs/" + self.log_time
+            if not os.path.exists(self.log_folder):
+                os.makedirs(self.log_folder)
+
+        elif os.path.isdir(log_path):
+            self.log_folder = log_path
+        else:
+            self.log_folder = Path(log_path).dirname()
+        self.log_path = Path(
+            os.path.join(
+                self.log_folder,
+                f"{self.log_time}_PegInsertionEnvV2.log",
+            )
+        )
+        print(self.log_path)
+        self.logger.add(
+            self.log_path,
+            filter=lambda record: record["extra"]["name"] == self.log_time,
+        )
+        self.unique_logger = self.logger.bind(name=self.log_time)
+
+        root = tk.Tk()
+        root.withdraw()  # 隐藏主窗口
+        self.msg_box = CustomMessageBox(root)
+
+        # ROS communication
+        rospy.init_node("peg_insertion_environment", anonymous=True)
+        left_sensor_topic_name = "Marker_Tracking_Left"
+        right_sensor_topic_name = "Marker_Tracking_Right"
+        left_sensor_img_topic_name = "Tactile_Image_Left"
+        right_sensor_img_topic_name = "Tactile_Image_Right"
+
+        self.sub_tactile_fb = rospy.Subscriber(
+            "Marker_Tracking_Contact",
+            judging_msg,
+            callback=callback_sensor,
+            queue_size=10,
+        )
+        self.sub_tactile_marker_flow_L = rospy.Subscriber(
+            left_sensor_topic_name,
+            tracking_msg,
+            callback=callback_marker_flow_left,
+            queue_size=10,
+        )
+        self.sub_tactile_marker_flow_R = rospy.Subscriber(
+            right_sensor_topic_name,
+            tracking_msg,
+            callback=callback_marker_flow_right,
+            queue_size=10,
+        )
+        self.left_sensor_init_marker_tracker_call = rospy.ServiceProxy(
+            "Marker_Tracking_Srv_Left", ResetMarkerTracker
+        )
+        self.right_sensor_init_marker_tracker_call = rospy.ServiceProxy(
+            "Marker_Tracking_Srv_Right", ResetMarkerTracker
+        )
+        global left_marker_flow_container
+        global right_marker_flow_container
+        global is_contact
+
+        # Initialize tactile marker noise thresholds
+        self._initialize_tactile_noise_thresholds()
+
+        self.marker_flow_size = 128
+        self.default_observation = self.__get_sensor_default_observation__()
+        self.observation_space = convert_observation_to_space(self.default_observation)
+
+    def __get_sensor_default_observation__(self) -> dict:
+
+        obs = {
+            "marker_flow": np.zeros((2, 2, self.marker_flow_size, 2), dtype=np.float32),
+        }
+
+        return obs
+
+
+    def _initialize_tactile_noise_thresholds(self):
+        # Clear containers
+        left_marker_flow_container.clear()
+        right_marker_flow_container.clear()
+
+        while (
+            left_marker_flow_container.current_size < 1
+            or right_marker_flow_container.current_size < 1
+            or not left_marker_flow_container.check_shape()
+            or not right_marker_flow_container.check_shape()
+        ):
+            time.sleep(0.1)
+
+        # Calculate noise thresholds
+        left_marker_seq = left_marker_flow_container.get(list(range(30)))
+        right_marker_seq = right_marker_flow_container.get(list(range(30)))
+
+        self.left_change_threshold = (
+            np.mean(
+                [
+                    np.mean(
+                        np.linalg.norm(
+                            left_marker_seq[i][1] - left_marker_seq[i][0], axis=-1
+                        )
+                    )
+                    for i in range(30)
+                ]
+            )
+            * 1.25
+        )
+        self.right_change_threshold = (
+            np.mean(
+                [
+                    np.mean(
+                        np.linalg.norm(
+                            right_marker_seq[i][1] - right_marker_seq[i][0], axis=-1
+                        )
+                    )
+                    for i in range(30)
+                ]
+            )
+            * 1.25
+        )
+
+        # Clamp thresholds to minimum values
+        self.left_change_threshold = max(self.left_change_threshold, 0.15)
+        self.right_change_threshold = max(self.right_change_threshold, 0.15)
+
+        self.unique_logger.info(
+            f"Tactile marker displacement thresholds: {self.left_change_threshold:.2f} (left), "
+            f"{self.right_change_threshold:.2f} (right)"
+        )
+
+
+
+    @staticmethod
+    def get_tactile_marker_flow():
+        global left_marker_flow_container
+        global right_marker_flow_container
+        left_marker_flow = left_marker_flow_container.get(-1)
+        right_marker_flow = right_marker_flow_container.get(-1)
+        return left_marker_flow, right_marker_flow
+
+    @staticmethod
+    def get_tactile_image_flow():
+        global right_marker_image_container
+        global left_marker_image_container
+        left_tactile_image_flow = left_marker_image_container.get(-1)
+        right_tactile_image_flow = right_marker_image_container.get(-1)
+        return left_tactile_image_flow, right_tactile_image_flow
+
+    @staticmethod
+    def get_marker_flow_difference(left_marker_flow, right_marker_flow):
+        l_diff = np.mean(
+            np.linalg.norm(left_marker_flow[1] - left_marker_flow[0], axis=-1)
+        )
+        r_diff = np.mean(
+            np.linalg.norm(right_marker_flow[1] - right_marker_flow[0], axis=-1)
+        )
+        return l_diff, r_diff
+
+    """
+    RL env methods
+    """
+
+    def get_obs(self, info=None):
+
+        obs_dict = dict()
+        self.obs_marker_flow = self.get_tactile_marker_flow()
+        l_flow, r_flow = self.obs_marker_flow
+        l_flow = adapt_marker_seq_to_unified_size(l_flow, 128)
+        r_flow = adapt_marker_seq_to_unified_size(r_flow, 128)
+        # if self.normalize_flow:
+        #     l_flow = l_flow / 160.0 - 1.0
+        #     r_flow = r_flow / 160.0 - 1.0
+
+        obs_dict["marker_flow"] = np.stack(
+            [
+                l_flow,
+                r_flow,
+            ],
+            axis=0,
+        ).astype(np.float32)
+
+        # if self.render_rgb:
+        #     obs_dict["rgb_images"] = self.tactile_img.copy()
+        return obs_dict
+
+
 
 if __name__ == "__main__":
 
