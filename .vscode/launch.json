@@ -1,0 +1,22 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "Python Debugger: Current File with Arguments",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "scripts_real/eval_real_peg_insertion_v2_cub.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--team_name", "STEIIA",
+                "--model_name", "TD3PolicyWithColoredPointsOffsetPrediction",
+                "--policy_file_path", "/home/tars/workspace/xx/tactile/STEIIA-PENTAC-3rd-commit/stg2_2nd/models/policy_stable.zip",
+                "--cfg_file_path", "/home/tars/workspace/xx/tactile/STEIIA-PENTAC-3rd-commit/stg2_2nd/Track_2/configs/parameters/peg_insertion_v2_points.yaml"
+            ]
+        }
+    ]
+}

@@ -178,7 +178,8 @@ def evaluate_policy(model, key: str, cfg_path: str, start_episode) -> None:
 
     # 测试循环
 
-    for kk in range(start_episode, test_num_hex + test_num_cub):
+    # for kk in range(start_episode, test_num_hex + test_num_cub):
+    for kk in range(3):
         if kk < test_num_cub:
             env.set_peg("cuboid")
         else:

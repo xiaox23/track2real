@@ -79,3 +79,9 @@ python catkin_ws/src/gelsight_mini_ros/scripts/listener.py
 ```bash
 python utils/real_sense_help.py
 ```
+
+## Run evaluation code
+Open a `roscore`, publish the tactile signal
+```bash
+python catkin_ws/src/gelsight_mini_ros/scripts/gs_node.py
+```

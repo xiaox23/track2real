@@ -142,16 +142,27 @@ class MotionManagerStageV2:
         self.stage.absoulte_movement('Y',  -199.734, speed, wait = False)  # y右移
         self.stage.absoulte_movement('Z', -122.481, speed, wait = False)    # z向上移动
         self.stage.absoulte_movement('C', -2.4, 0.01*speed, wait = False) # c轴逆时针旋转
-        time.sleep(1)
-        self.gripper.open()
-        time.sleep(1)
+        time.sleep(0.5)
+        self.gripper.reset()
+        time.sleep(0.5)
         self.stage.absoulte_movement('X', -180.012, speed, wait = False)  # x前进
 
     def cubhome2origin(self):
-        speed = 15000  # 设置运动速度
-        self.stage.absoulte_movement('X', 10, speed, wait = False)  # x后退
-        self.stage.incremental_movement('Y',  22.625, speed, wait = False)  # y左移
-        self.stage.incremental_movement('Z', -55, speed, wait = False)    # z向上移动
+        speed = 1500  # 设置运动速度
+        # self.stage.incremental_movement('X', 20, speed, wait = False)  # x后退
+        # self.stage.incremental_movement('Y',  22.625, speed, wait = False)  # y左移
+        # self.stage.incremental_movement('Z', -55, speed, wait = False)    # z向上移动
+        self.stage.absoulte_movement('X', -160.012, speed, wait = False)  # x前进
+        self.stage.absoulte_movement('Y',  -177.109, speed, wait = False)  # y右移
+        self.stage.absoulte_movement('Z', -177.481, speed, wait = False)    # z向上移动
+        self.stage.absoulte_movement('C', -2.4, 0.01*speed, wait = False) # c轴逆时针旋转
+        
+    def anywhere2cubhome(self):
+        speed = 1500  # 设置运动速度
+        self.stage.absoulte_movement('X', -180.012, speed, wait = False)
+        self.stage.absoulte_movement('Y',  -199.734, speed, wait = False)
+        self.stage.absoulte_movement('Z', -122.481, speed, wait = False)
+        self.stage.absoulte_movement('C', -2.4, 0.01*speed, wait = False)
 
 
 
@@ -459,17 +470,11 @@ class MotionManagerStageV2:
 
     def go_relative_offset(self, x, y, theta, z, vel=15000):
         """移动一个offset"""
-        self.stage.incremental_movement("X", z, speed=vel, wait=False)
-        while self.is_moving():
-            time.sleep(0.2)
-        self.stage.incremental_movement("Z", x, speed=vel, wait=False)
-        while self.is_moving():
-            time.sleep(0.2)
-        self.stage.incremental_movement("Y", y, speed=vel, wait=False)
-        while self.is_moving():
-            time.sleep(0.2)
-        theta = theta*10/360
-        self.stage.incremental_movement("C", theta, speed=0.001*vel,wait=False)
+        self.stage.incremental_movement("X", round(z, 3), speed=vel, wait=False)
+        self.stage.incremental_movement("Z", round(-x, 3), speed=vel, wait=False)
+        self.stage.incremental_movement("Y", round(y, 3), speed=vel, wait=False)
+        theta = round(theta * 10 / 360, 3)
+        self.stage.incremental_movement("C", theta, speed=0.01*vel,wait=False)
         while self.is_moving():
             time.sleep(0.2)
 

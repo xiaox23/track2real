@@ -194,7 +194,7 @@ class MoveControl:
             data = self.ser.read(4)
             if len(data) == 4:
                 position = self.f_hexToSignedInt(data.hex())
-                if (position - position_last) == target_position * 1000:
+                if (position - position_last) == round(target_position * 1000, 0):
                     print(f"{axis}轴运动到目标位置 {target_position}")
                     break
             time.sleep(0.1)

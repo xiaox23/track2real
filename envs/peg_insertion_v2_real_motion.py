@@ -329,8 +329,8 @@ class PegInsertionRealEnvV2(gym.Env):
 
         # Wait until containers have enough data
         while (
-            left_marker_flow_container.current_size < 30
-            or right_marker_flow_container.current_size < 30
+            left_marker_flow_container.current_size < 1
+            or right_marker_flow_container.current_size < 1
             or not left_marker_flow_container.check_shape()
             or not right_marker_flow_container.check_shape()
         ):
@@ -460,8 +460,8 @@ class PegInsertionRealEnvV2(gym.Env):
         reset_tracker = False
         if self.current_episode % 1 == 0 or self.switch_peg_flag:
             reset_tracker = True
-        # if self.switch_peg_flag:
-        #     reset_tracker = True
+        if self.switch_peg_flag:
+            reset_tracker = True
 
         if self.peg_in_gripper:
             # self.motion_manager.move_peg_from_anywhere_to_garage(reset_tracker)
@@ -473,13 +473,15 @@ class PegInsertionRealEnvV2(gym.Env):
             self.motion_manager.go_to_safe_height()
             self.motion_manager.go_to_garage_xytheta()
 
+        self.motion_manager.cubhome2origin()
+        
         if reset_tracker:
             self.first_color_image_mask = self.realsense.reset_tracker()
             if self.switch_peg_flag:
                 self.switch_peg_flag = False
 
         # self.motion_manager.move_peg_from_garage_to_origin(reset_tracker)
-        self.motion_manager.cubhome2origin()
+        
         self._update_peg_status()
 
         return self.first_color_image_mask
@@ -554,7 +556,7 @@ class PegInsertionRealEnvV2(gym.Env):
             y=float(offset_y),
             theta=float(offset_theta),
             z=float(offset_z),
-            vel=15000,
+            vel=1500,
         )
         self.reset_marker_tracker()
         # self._initialize_tactile_noise_thresholds()
@@ -672,7 +674,7 @@ class PegInsertionRealEnvV2(gym.Env):
                 y=action_y_mm,
                 theta=action_theta_deg,
                 z=action_z_mm,
-                vel=15000,
+                vel=1500,
             )
             time.sleep(0.1)
             # if is_overforced or self.check_force_limits():
@@ -849,12 +851,12 @@ class PegInsertionRealEnvV2(gym.Env):
 
     def close(self):
         if self.peg_in_gripper:
-            self.motion_manager.move_peg_from_anywhere_to_garage(True)
-            self.motion_manager.move_peg_from_garage_to_save()
+            self.motion_manager.anywhere2cubhome()
+            # self.motion_manager.move_peg_from_garage_to_save()
             self.peg_in_gripper = False
         self.reset_marker_tracker()
         self.motion_manager.close()
-        self.sub_force.unregister()
+        # self.sub_force.unregister()
 
     def check_force_limits(self):
         # global force_data
