@@ -21,7 +21,8 @@ def update_robotiq_command(char, command, speed=100):
         command.rACT = 0
 
     if char == 'c':
-        command.rPR = 168
+        # command.rPR = 168
+        command.rPR = 200
 
     if char == 'o':
         command.rPR = 0
@@ -270,9 +271,9 @@ if __name__ == "__main__":
     gripper.reset()  # 能够激活夹爪
     print(gripper.is_active())
     gripper.close()
-    time.sleep(1)
-    gripper.open()
-    time.sleep(1)
+    # time.sleep(1)
+    # gripper.open()
+    # time.sleep(1)
     exit()
     #time.sleep(1)
     # for i in range(255):

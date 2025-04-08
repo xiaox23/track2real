@@ -1226,6 +1226,271 @@ class PegInsertionRealEnvV2_tac(gym.Env):
         return obs_dict
 
 
+class PegInsertionRealEnvV2_vis(gym.Env):
+    def __init__(
+        self,
+        motion_manager: MotionManagerStageV2,
+        max_action_mm_deg,
+        peg,  # hex
+        max_steps,
+        normalize,
+        grasp_height_offset,
+        insertion_depth_mm: float,
+        # for logging
+        log_path=None,
+        logger=None,
+        # for vision
+        vision_params: dict = None,
+        # render_rgb
+        render_rgb=False,
+    ):
+        # for logging
+        time.sleep(np.random.rand(1)[0])
+        if logger is None:
+            self.logger = log
+            self.logger.remove()
+        else:
+            self.logger = logger
+
+        self.log_time = get_time()
+        self.pid = os.getpid()
+        if log_path is None:
+            self.log_folder = track_path + "/envs/" + self.log_time
+            if not os.path.exists(self.log_folder):
+                os.makedirs(self.log_folder)
+
+        elif os.path.isdir(log_path):
+            self.log_folder = log_path
+        else:
+            self.log_folder = Path(log_path).dirname()
+        self.log_path = Path(
+            os.path.join(
+                self.log_folder,
+                f"{self.log_time}_PegInsertionEnvV2.log",
+            )
+        )
+        print(self.log_path)
+        self.logger.add(
+            self.log_path,
+            filter=lambda record: record["extra"]["name"] == self.log_time,
+        )
+        self.unique_logger = self.logger.bind(name=self.log_time)
+        # if not os.path.exists(self.log_folder + "/tracker_img/"):
+        #     os.makedirs(self.log_folder + "/tracker_img/")
+
+        root = tk.Tk()
+        root.withdraw()  # 隐藏主窗口
+        self.msg_box = CustomMessageBox(root)
+
+        # environment parameters
+        self.current_episode = 0
+        self.max_action_mm_deg = np.array(max_action_mm_deg)
+        # self.step_penalty = step_penalty
+        # self.final_reward = final_reward
+        self.max_steps = max_steps
+        self.current_episode_elapsed_steps = 0
+        self.error_too_large = False
+        self.too_many_steps = False
+        self.tactile_movement_too_large = False
+        self.current_episode_max_tactile_diff = 0
+        self.current_episode_over = False
+
+        self.render_rgb = render_rgb
+
+        self.peg = peg
+        self.target_insertion_depth_mm = insertion_depth_mm
+
+        self.normalize_flow = normalize
+        self.grasp_height_offset = grasp_height_offset
+
+        # vision related
+        self.realsense = RealSenseHelp(self.peg)
+        self.camera_size = (480, 640)
+        self.vision_params = vision_params
+        self.max_points = self.vision_params["max_points"]
+
+        # motion stage related
+        # self.msg_box.show_message("Please make sure the peg is in the save position.")
+        self.motion_manager = motion_manager
+
+        self.peg_in_gripper = False
+        if not self.motion_manager.gripper.is_active():
+            self.motion_manager.reset_gripper()
+
+        self.reset_marker_tracker()
+
+        # Initialize tactile marker noise thresholds
+        self._initialize_tactile_noise_thresholds()
+
+        self.action_space = Box(low=-1, high=1, shape=(3,), dtype=np.float32)
+
+        self.marker_flow_size = 128
+        self.default_observation = self.__get_sensor_default_observation__()
+        self.observation_space = convert_observation_to_space(self.default_observation)
+
+    def __get_sensor_default_observation__(self) -> dict:
+
+        obs = {
+            "rgb_picture": np.zeros(
+                (self.camera_size[0], self.camera_size[1], 3), dtype=np.uint8
+            ),
+            "depth_picture": np.zeros(
+                (self.camera_size[0], self.camera_size[1]), dtype=np.float32
+            ),
+            "point_cloud": np.zeros(
+                (self.camera_size[0], self.camera_size[1], 3), dtype=np.float32
+            ),
+            "object_point_cloud": np.zeros((2, self.max_points, 3), dtype=np.float32),
+        }
+
+        return obs
+
+
+    """
+    Motion related methods
+    """
+
+    def reset_marker_tracker(self):
+        if not (
+            self.left_sensor_init_marker_tracker_call()
+            and self.right_sensor_init_marker_tracker_call()
+        ):
+            raise Exception("Failed to reset marker trackers.")
+        time.sleep(0.5)
+
+    def reset_peg_pose(self):
+        self._update_peg_status()
+        reset_tracker = False
+        if self.current_episode % 1 == 0 or self.switch_peg_flag:
+            reset_tracker = True
+        if self.switch_peg_flag:
+            reset_tracker = True
+
+        if self.peg_in_gripper:
+            # self.motion_manager.move_peg_from_anywhere_to_garage(reset_tracker)
+            pass
+
+        else:
+            self.msg_box.show_message("Please put the peg in the garage.")
+
+        self.motion_manager.cubhome2origin()
+        
+        if reset_tracker:
+            self.first_color_image_mask = self.realsense.reset_tracker()
+            if self.switch_peg_flag:
+                self.switch_peg_flag = False
+
+        # self.motion_manager.move_peg_from_garage_to_origin(reset_tracker)
+        
+        self._update_peg_status()
+
+        return self.first_color_image_mask
+
+
+    """
+    RL env methods
+    """
+
+    def reset(self, offset_mm_deg):
+        self.unique_logger.info(
+            "*************************************************************"
+        )
+        self.unique_logger.info("reset once")
+        self.current_episode += 1
+
+        # reset peg pose
+        first_color_image_mask = self.reset_peg_pose()
+
+        # Reset episodic variables
+
+        self.current_episode_elapsed_steps = 0
+        self.error_too_large = False
+        self.too_many_steps = False
+        self.tactile_movement_too_large = False
+        self.current_episode_max_tactile_diff = 0
+
+        # # Reset force baseline
+        # self.get_force_baseline()
+
+        # Initialize offset
+        offset_mm_deg = np.array(offset_mm_deg)
+        offset_x, offset_y, offset_theta, offset_z = offset_mm_deg
+        self.z_target_mm = offset_z + self.target_insertion_depth_mm
+        y_start_mm = 45.25 / 2  # mm, based on assets/peg_insertion/hole_2.5mm.STL
+        if self.peg == "hexagon":
+            self.y_target_mm = 45.25
+        else:
+            self.y_target_mm = 0
+        self.motion_manager.go_relative_offset(
+            x=float(offset_x),
+            y=float(offset_y),
+            theta=float(offset_theta),
+            z=float(offset_z),
+            vel=1500,
+        )
+        self.reset_marker_tracker()
+        # self._initialize_tactile_noise_thresholds()
+        self.current_episode_initial_z_pos = self.motion_manager.get_position('Z')
+
+        # Get initial observations
+        self.current_episode_initial_left_observation = (
+            adapt_marker_seq_to_unified_size(left_marker_flow_container.get(-1), 128)
+        )
+        self.current_episode_initial_right_observation = (
+            adapt_marker_seq_to_unified_size(right_marker_flow_container.get(-1), 128)
+        )
+        if self.normalize_flow:
+            self.current_episode_initial_left_observation = (
+                self.current_episode_initial_left_observation / 160.0 - 1.0
+            )
+            self.current_episode_initial_right_observation = (
+                self.current_episode_initial_right_observation / 160.0 - 1.0
+            )
+        self.sensor_grasp_center_init_mm_deg = offset_mm_deg.copy().astype(np.float32)
+        self.sensor_grasp_center_current_mm_deg = offset_mm_deg.copy().astype(
+            np.float32
+        )
+
+        offset_mm_deg[1] = offset_mm_deg[1] + y_start_mm - self.y_target_mm
+        offset_mm_deg[3] = self.z_target_mm + 0.5
+        self.current_offset_of_current_episode_mm_deg = offset_mm_deg.copy().astype(
+            np.float32
+        )
+
+        obs = self.get_obs()
+
+        return obs, first_color_image_mask
+
+
+
+    def get_obs(self, info=None):
+
+        obs_dict = dict()
+
+        vision_results = self.realsense.get_vision_result(max_points=self.max_points)
+        obs_dict["raw_color_image"] = vision_results["raw_color_image"]
+        obs_dict["raw_depth_image"] = vision_results["raw_depth_image"]
+        obs_dict["raw_point_cloud"] = vision_results["raw_point_cloud"]
+        obs_dict["rgb_picture"] = vision_results["color_image"]
+        obs_dict["depth_picture"] = vision_results["depth_image"]
+        obs_dict["point_cloud"] = vision_results["point_cloud"]
+        obs_dict["object_point_cloud"] = vision_results["object_point_cloud"]
+        obs_dict["mask"] = vision_results["mask"]
+        obs_dict["raw_color_image_masked"] = vision_results["raw_color_image_masked"]
+        temp_path = f"{self.log_folder}/tracker_img/{self.current_episode}_{self.current_episode_elapsed_steps}.jpg"
+        self.realsense.save_images_together(
+            obs_dict["rgb_picture"], obs_dict["depth_picture"], temp_path
+        )
+        return obs_dict
+
+
+    def close(self):
+        self.reset_marker_tracker()
+        self.motion_manager.close()
+        # self.sub_force.unregister()
+
+
+
 
 if __name__ == "__main__":
 

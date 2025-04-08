@@ -19,16 +19,13 @@ from loguru import logger as log
 from utils.RL_data_save_load_helper import RlDataSaveLoadHelper
 from envs.motion_manager_stage_v2 import MotionManagerStageV2
 
-# import git
-
-
-from envs.peg_insertion_v2_real_motion import PegInsertionRealEnvV2_tac
+from envs.peg_insertion_v2_real_motion import PegInsertionRealEnvV2_vis
 import ruamel.yaml as yaml
 
 
-SAVE_DIR = 'real_tac_data'
-os.makedirs(SAVE_DIR, exist_ok=True)
-CNT = len(os.listdir(SAVE_DIR))
+# SAVE_DIR = 'real_tac_data'
+# os.makedirs(SAVE_DIR, exist_ok=True)
+# CNT = len(os.listdir(SAVE_DIR))
 
 
 PRE_DELETE_ENV_KEY = [
@@ -122,7 +119,7 @@ if __name__ == "__main__":
         }
     )
 
-    env = PegInsertionRealEnvV2_tac(**specified_env_args)
+    env = PegInsertionRealEnvV2_vis(**specified_env_args)
 
     # 定义全局变量
     running = False  # 控制循环状态
@@ -143,15 +140,15 @@ if __name__ == "__main__":
 
         if running:
             print("循环中...")
-            time.sleep(0.1)  # 模拟循环任务
-            # time.sleep(1)  # 模拟循环任务
-            obs = env.get_obs()
-            tac_mf = obs['marker_flow']
-            save_path = os.path.join(SAVE_DIR, str("%04d"%CNT))
-            os.makedirs(save_path, exist_ok=True)
-            save_name = os.path.join(save_path, str("%05d"%frame_num) + '.npy')
-            np.save(save_name, tac_mf)
-            frame_num += 1
+            # time.sleep(0.5)  # 模拟循环任务
+            time.sleep(0.5)  # 模拟循环任务
+            # obs = env.get_obs()
+            # tac_mf = obs['marker_flow']
+            # save_path = os.path.join(SAVE_DIR, str("%04d"%CNT))
+            # os.makedirs(save_path, exist_ok=True)
+            # save_name = os.path.join(save_path, str("%05d"%frame_num) + '.npy')
+            # np.save(save_name, tac_mf)
+            # frame_num += 1
             
 
         else:
