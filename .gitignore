@@ -13,3 +13,5 @@ TrackAnythingmaster/test_sample/
 
 # 忽略eval文件
 eval_log/
+real_tac_data/
+marker_flow_images/

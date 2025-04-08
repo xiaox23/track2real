@@ -134,6 +134,7 @@ if __name__ == "__main__":
     listener.start()  # 启动监听器
 
     frame_num = 0
+    print("wait for keyboard input:")
     while True:
         if exit_program:  # 检查退出标志
             print("主循环退出")
@@ -142,7 +143,8 @@ if __name__ == "__main__":
 
         if running:
             print("循环中...")
-            time.sleep(0.5)  # 模拟循环任务
+            # time.sleep(0.5)  # 模拟循环任务
+            time.sleep(1)  # 模拟循环任务
             obs = env.get_obs()
             tac_mf = obs['marker_flow']
             save_path = os.path.join(SAVE_DIR, str("%04d"%CNT))
