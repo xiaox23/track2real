@@ -21,8 +21,8 @@ def update_robotiq_command(char, command, speed=100):
         command.rACT = 0
 
     if char == 'c':
-        # command.rPR = 168
-        command.rPR = 200
+        command.rPR = 168
+        # command.rPR = 200
 
     if char == 'o':
         command.rPR = 0

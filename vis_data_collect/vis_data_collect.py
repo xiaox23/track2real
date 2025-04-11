@@ -1,155 +1,82 @@
-#!/bin/bash
-import copy
-import os
 import sys
-import keyboard
 import time
-from pynput import keyboard
-
-script_path = os.path.dirname(os.path.realpath(__file__))
-track_path = os.path.abspath(os.path.join(script_path, ".."))
-repo_path = os.path.abspath(os.path.join(track_path, ".."))
-sys.path.append(script_path)
-sys.path.append(track_path)
-sys.path.append(repo_path)
-import numpy as np
-from path import Path
-from utils.common import get_time
-from loguru import logger as log
-from utils.RL_data_save_load_helper import RlDataSaveLoadHelper
-from envs.motion_manager_stage_v2 import MotionManagerStageV2
-
-from envs.peg_insertion_v2_real_motion import PegInsertionRealEnvV2_vis
-import ruamel.yaml as yaml
+# 动态添加项目的根目录到 PYTHONPATH
+project_root = "/home/tars/workspace/xx/tactile/track2real"
+if project_root not in sys.path:
+    sys.path.append(project_root)
 
 
-# SAVE_DIR = 'real_tac_data'
-# os.makedirs(SAVE_DIR, exist_ok=True)
-# CNT = len(os.listdir(SAVE_DIR))
-
-
-PRE_DELETE_ENV_KEY = [
-    "env_name",
-    "gui",
-    "marker_interval_range",
-    "marker_lose_tracking_probability",
-    "marker_pos_shift_range",
-    "marker_random_noise",
-    "marker_rotation_range",
-    "marker_translation_range",
-    "params",
-    "peg_dist_z_diff_mm",
-        "peg_dist_z_mm",
-    "peg_hole_path_file",
-    "peg_theta_max_offset_deg",
-    "peg_x_max_offset_mm",
-    "peg_y_max_offset_mm",
-    "step_penalty",
-    "final_reward",
-]
-
-def on_press(key):
-    global running, exit_program, CNT  # 声明全局变量
-    try:
-        if key.char == 'a':  # 检测是否按下 'a' 键
-            CNT += 1 
-            if not running:
-                running = True
-                print("循环开始...")
-
-        elif key.char == 'b':  # 检测是否按下 'b' 键
-            if running:
-                running = False
-                print("循环结束。")
-
-        elif key.char == 'q':  # 检测是否按下 'q' 键
-            print("程序退出。")
-            exit_program = True  # 设置退出标志
-            return False  # 停止监听器
-    except AttributeError:
-        pass  # 忽略特殊按键
-
-
-if __name__ == "__main__":
-
-    exp_start_time = get_time()
-    exp_name = f"peg_insertion_v2_{exp_start_time}"
-    log_folder = Path(os.path.join(track_path, f"eval_log/{exp_name}"))
-    log_dir = Path(os.path.join(log_folder, "main.log"))
-    log.remove()
-    log.add(
-        log_dir,
-        filter=lambda record: record["extra"]["name"] == "main",
-    )
-
-    log.add(
-        sys.stderr,
-        format="{time:YYYY-MM-DD HH:mm:ss} {level} {message}",
-        level="INFO",
-        filter=lambda record: record["extra"]["name"] == "main",
-    )
-    eval_log = log.bind(name="main")
-    save_data_helper = RlDataSaveLoadHelper(log_folder)
-    motion_manager = MotionManagerStageV2(
-        "/dev/ttyUSB0", "/dev/ttyUSB1", "hexagon", 50
-    )
-
-    with open("/home/tars/workspace/xx/tactile/STEIIA-PENTAC-3rd-commit/stg2_2nd/Track_2/configs/parameters/peg_insertion_v2_points.yaml", "r") as f:
-        cfg = yaml.YAML(typ="safe", pure=True).load(f)
-
-    if "max_action" in cfg["env"].keys():
-        cfg["env"]["max_action"] = np.array(cfg["env"]["max_action"])
+import random
+from control import control
+from envs.robotiq_controller import RobotiqGripper
 
 
 
-    specified_env_args = copy.deepcopy(cfg["env"])
-    for delete_key in PRE_DELETE_ENV_KEY:
-        if delete_key in specified_env_args:
-            del specified_env_args[delete_key]
+######   走到夹持peg的点   ######
+controller = control.MoveControl(port='/dev/ttyUSB0', baudrate=115200)
+gripper = RobotiqGripper('/dev/ttyUSB1', default_speed=50)
+gripper.reset()
+### zero2cubhome ###
+speed = 15000
+controller.absoulte_movement('Y',  -199.734, speed, wait = False)  # y右移
+controller.absoulte_movement('Z', -122.481, speed, wait = False)    # z向上移动
+controller.absoulte_movement('C', -2.4, 0.01*speed, wait = False) # c轴逆时针旋转
+controller.absoulte_movement('X', -180.012, speed, wait = False)  # x前进
+### graspcubpeg ###
+gripper.close()
+### cubhome2origin ###
+speed = 1500
+controller.absoulte_movement('X', -160.012, speed, wait = False)  # x前进
+controller.absoulte_movement('Y', -177.109, speed, wait = False)  # y右移
+controller.absoulte_movement('Z', -177.481, speed, wait = False)    # z向上移动
+    
 
-    eval_log.info(specified_env_args)
+######  创建移动轨迹  ######
+# 极值：
+X_min = -162.278
+Y_min = -246.975
+Z_min = -222.243
+C_min = -3.4
+X_max = -132.278
+Y_max = -117.743
+Z_max = -61.584
+C_max = -1.4
 
-    specified_env_args.update(
-        {
-            "motion_manager": motion_manager,
-            "peg": "hexagon",
-            "log_path": log_folder,
-            "logger": log,
-            "grasp_height_offset": 0
-        }
-    )
+random.seed(41)
 
-    env = PegInsertionRealEnvV2_vis(**specified_env_args)
+def generate_waypoints(num_points=10):
+    waypoints = []
+    for _ in range(num_points):
+        # 随机生成坐标，范围是负极值到 0
+        x = random.uniform(X_min, X_max)
+        y = random.uniform(Y_min, Y_max)
+        z = random.uniform(Z_min, Z_max)
+        c = random.uniform(C_min, C_max)
+        waypoints.append((round(x, 1), round(y, 1), round(z, 1), round(c, 3)))  # 保留 1 位小数
+    return waypoints
 
-    # 定义全局变量
-    running = False  # 控制循环状态
-    exit_program = False  # 控制程序退出状态
+waypoints = generate_waypoints(3)
+
+# 打印生成的途径点
+print("生成的固定随机途径点：")
+for i, point in enumerate(waypoints):
+    print(f"途径点 {i + 1}: X={point[0]}, Y={point[1]}, Z={point[2]}, C={point[3]}")
 
 
-    # 创建键盘监听器
-    listener = keyboard.Listener(on_press=on_press)
-    listener.start()  # 启动监听器
+######  执行移动轨迹  ######
+speed = 15000  # 设置运动速度
+for i, point in enumerate(waypoints):
+# 确保三位小数：
+    # controller.absoulte_movement('X', round(point[0], 3), speed, wait=False)
+    # controller.absoulte_movement('Y', round(point[1], 3), speed, wait=False)
+    # controller.absoulte_movement('Z', round(point[2], 3), speed, wait=False)
+    controller.absoulte_movement('X', point[0], speed, wait=False)
+    controller.absoulte_movement('Y', point[1], speed, wait=False)
+    controller.absoulte_movement('Z', point[2], speed, wait=False)
+    controller.absoulte_movement('C', point[3], 0.01*speed, wait=False)
+    time.sleep(1)
 
-    frame_num = 0
-    print("wait for keyboard input:")
-    while True:
-        if exit_program:  # 检查退出标志
-            print("主循环退出")
-            listener.stop()  # 显式停止监听器
-            break
+controller.close()
+print("===========over==============")
 
-        if running:
-            print("循环中...")
-            # time.sleep(0.5)  # 模拟循环任务
-            time.sleep(0.5)  # 模拟循环任务
-            # obs = env.get_obs()
-            # tac_mf = obs['marker_flow']
-            # save_path = os.path.join(SAVE_DIR, str("%04d"%CNT))
-            # os.makedirs(save_path, exist_ok=True)
-            # save_name = os.path.join(save_path, str("%05d"%frame_num) + '.npy')
-            # np.save(save_name, tac_mf)
-            # frame_num += 1
-            
-
-        else:
-            time.sleep(0.1)  # 减少 CPU 占用
+######  实例化相机  ######
